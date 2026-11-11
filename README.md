@@ -2003,6 +2003,9 @@ set :protection, :session => true
     <p>
       You can pass a hash of options to <tt>host_authorization</tt>,
       to be used by the <tt>Rack::Protection::HostAuthorization</tt> middleware.
+      Set it to <tt>false</tt> to disable the middleware without disabling the
+      other protections. Disabling all protections with <tt>disable :protection</tt>
+      also disables it.
     </p>
     <p>
       The middleware can block requests with unrecognized hostnames, to prevent DNS rebinding
