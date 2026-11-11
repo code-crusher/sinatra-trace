@@ -45,6 +45,45 @@ RSpec.describe Sinatra::JSON do
     results_in 'foo' => [1, 'bar', nil]
   end
 
+  it "uses the canonical multi_json constant as the default encoder" do
+    # multi_json 1.21 renamed the MultiJson constant to MultiJSON and
+    # deprecated the old name (issue #2170).  The default encoder must be
+    # whichever constant is canonical for the installed version.
+    canonical = defined?(::MultiJSON) ? ::MultiJSON : ::MultiJson
+    mock_app { get('/') { json :foo => 'bar' } }
+    expect(settings.json_encoder).to eq canonical
+  end
+
+  it "encodes objects with Sinatra::JSON.encode" do
+    canonical = defined?(::MultiJSON) ? ::MultiJSON : ::MultiJson
+    expect(Sinatra::JSON.encode(:foo => [1, 'bar', nil]))
+      .to eq canonical.dump(:foo => [1, 'bar', nil])
+  end
+
+  it "prefers generate over encode when the encoder offers both" do
+    # multi_json >= 1.21 keeps #encode around as a deprecated alias for
+    # #generate; the former must not be used when both are available.
+    enc = Object.new
+    def enc.generate(_obj) 'from generate' end
+    def enc.encode(_obj) 'from encode' end
+    mock_app do
+      set :json_encoder, enc
+      get('/') { json 42 }
+    end
+    expect(get('/').body).to eq('from generate')
+  end
+
+  it "emits no multi_json deprecation warnings in the default flow" do
+    # Canary for issue #2170: with multi_json >= 1.21 installed, the
+    # deprecated MultiJson constant and encode/dump methods must never be
+    # reached.  With older versions no multi_json warning exists at all.
+    warnings = []
+    allow(Warning).to receive(:warn) { |*args| warnings << args.first }
+    mock_app { get('/') { json :foo => [1, 'bar', nil] } }
+    results_in 'foo' => [1, 'bar', nil]
+    expect(warnings.join("\n")).not_to match(/multi_?json/i)
+  end
+
   it "sets the content type to 'application/json'" do
     mock_app { get('/') { json({}) } }
     expect(get('/')["Content-Type"]).to include("application/json")

@@ -3,6 +3,13 @@
 require 'sinatra/base'
 require 'multi_json'
 module Sinatra
+  # multi_json 1.21 renamed the +MultiJson+ constant to +MultiJSON+ and
+  # deprecated the old name, along with the +encode+ and +dump+ methods, in
+  # favour of +generate+.  Prefer the canonical constant and method name when
+  # available, and fall back to the deprecated ones on earlier versions of
+  # the gem.
+  MULTI_JSON = defined?(::MultiJSON) ? ::MultiJSON : ::MultiJson
+
   # = Sinatra::JSON
   #
   # <tt>Sinatra::JSON</tt> adds a helper method, called +json+, for (obviously)
@@ -90,7 +97,9 @@ module Sinatra
   module JSON
     class << self
       def encode(object)
-        ::MultiJson.dump(object)
+        return MULTI_JSON.generate(object) if MULTI_JSON.respond_to? :generate
+
+        MULTI_JSON.dump(object)
       end
     end
 
@@ -110,7 +119,7 @@ module Sinatra
     end
 
     def resolve_encoder_action(object, encoder)
-      %i[encode generate].each do |method|
+      %i[generate encode].each do |method|
         return encoder.send(method, object) if encoder.respond_to? method
       end
       raise "#{encoder} does not respond to #generate nor #encode" unless encoder.is_a? Symbol
@@ -120,7 +129,7 @@ module Sinatra
   end
 
   Base.set :json_encoder do
-    ::MultiJson
+    Sinatra::MULTI_JSON
   end
 
   Base.set :json_content_type, :json
