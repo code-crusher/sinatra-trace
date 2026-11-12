@@ -107,4 +107,32 @@ class MiddlewareTest < Minitest::Test
     @app.use KeywordArgumentInitializationMiddleware, argument: "argument"
     get '/'
   end
+
+  class StrictKeywordArgumentsMiddleware < MockMiddleware
+    attr_reader :argument
+
+    def initialize(app, argument:)
+      @argument = argument
+      super app
+    end
+
+    def call(env)
+      (env['test.ran'] ||= []) << argument
+      super
+    end
+  end
+
+  it "passes keyword arguments through to the middleware" do
+    @app.use StrictKeywordArgumentsMiddleware, argument: "value"
+    get '/'
+    assert_equal ['value', 'MiddlewareTest::StrictKeywordArgumentsMiddleware'],
+                 last_request.env['test.ran']
+  end
+
+  it "does not convert keyword arguments to a positional hash" do
+    @app.use StrictKeywordArgumentsMiddleware, argument: "value"
+    _middleware, args, kwargs, _block = @app.middleware.first
+    assert_equal [], args
+    assert_equal({ argument: 'value' }, kwargs)
+  end
 end

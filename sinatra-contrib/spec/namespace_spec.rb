@@ -777,6 +777,32 @@ RSpec.describe Sinatra::Namespace do
     end
   end
 
+  describe 'middleware' do
+    class KeywordArgumentMiddleware
+      def initialize(app, level: :info)
+        @app, @level = app, level
+      end
+
+      def call(env)
+        status, headers, body = @app.call(env)
+        headers['X-Level'] = @level.to_s
+        [status, headers, body]
+      end
+    end
+
+    it 'does not collapse keyword arguments into a positional hash' do
+      mock_app do
+        namespace '/admin' do
+          use KeywordArgumentMiddleware, level: :debug
+          get('/') { 'ok' }
+        end
+      end
+
+      expect(get('/admin/').status).to eq(200)
+      expect(last_response.headers['X-Level']).to eq('debug')
+    end
+  end
+
   describe 'settings' do
     it 'provides access to top-level settings' do
       mock_app do

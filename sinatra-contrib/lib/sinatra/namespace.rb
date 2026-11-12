@@ -213,8 +213,8 @@ module Sinatra
         super.fetch(:nested, @namespace) { TemplateCache.new }
       end
 
-      def redirect_to(uri, *args)
-        redirect("#{@namespace.pattern}#{uri}", *args)
+      def redirect_to(uri, *args, **kwargs)
+        redirect("#{@namespace.pattern}#{uri}", *args, **kwargs)
       end
     end
 
@@ -235,7 +235,7 @@ module Sinatra
       ]
 
       def self.prefixed(*names)
-        names.each { |n| define_method(n) { |*a, &b| prefixed(n, *a, &b) } }
+        names.each { |n| define_method(n) { |*a, **kw, &b| prefixed(n, *a, **kw, &b) } }
       end
 
       prefixed :before, :after, :delete, :get, :head, :options, :patch, :post, :put
@@ -254,8 +254,8 @@ module Sinatra
         end
       end
 
-      def invoke_hook(name, *args)
-        @extensions.each { |e| e.send(name, *args) if e.respond_to?(name) }
+      def invoke_hook(name, *args, **kwargs)
+        @extensions.each { |e| e.send(name, *args, **kwargs) if e.respond_to?(name) }
       end
 
       def not_found(&block)
@@ -352,8 +352,8 @@ module Sinatra
         result
       end
 
-      def method_missing(method, *args, &block)
-        base.send(method, *args, &block)
+      def method_missing(method, *args, **kwargs, &block)
+        base.send(method, *args, **kwargs, &block)
       end
 
       def respond_to?(method, include_private = false)

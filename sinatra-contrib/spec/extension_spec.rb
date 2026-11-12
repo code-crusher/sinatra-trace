@@ -29,4 +29,34 @@ RSpec.describe Sinatra::Extension do
     expect(get('/')).to be_ok
     expect(body).to eq("from extension, yay")
   end
+
+  describe 'middleware with keyword arguments' do
+    class KeywordLogger
+      def initialize(app, level: :info)
+        @app, @level = app, level
+      end
+
+      def call(env)
+        status, headers, body = @app.call(env)
+        headers['X-Level'] = @level.to_s
+        [status, headers, body]
+      end
+    end
+
+    module KeywordLoggerExtension
+      extend Sinatra::Extension
+
+      use KeywordLogger, level: :debug
+    end
+
+    it 'does not collapse keyword arguments into a positional hash' do
+      mock_app do
+        register KeywordLoggerExtension
+        get('/') { 'ok' }
+      end
+
+      expect(get('/')).to be_ok
+      expect(last_response.headers['X-Level']).to eq('debug')
+    end
+  end
 end

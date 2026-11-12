@@ -1581,11 +1581,10 @@ module Sinatra
       end
 
       # Use the specified Rack middleware
-      def use(middleware, *args, &block)
+      def use(middleware, *args, **kwargs, &block)
         @prototype = nil
-        @middleware << [middleware, args, block]
+        @middleware << [middleware, args, kwargs, block]
       end
-      ruby2_keywords(:use) if respond_to?(:ruby2_keywords, true)
 
       # Stop the self-hosted server if running.
       def quit!
@@ -1781,8 +1780,8 @@ module Sinatra
         signature
       end
 
-      def invoke_hook(name, *args)
-        extensions.each { |e| e.send(name, *args) if e.respond_to?(name) }
+      def invoke_hook(name, *args, **kwargs)
+        extensions.each { |e| e.send(name, *args, **kwargs) if e.respond_to?(name) }
       end
 
       def generate_method(method_name, &block)
@@ -1828,7 +1827,7 @@ module Sinatra
       end
 
       def setup_middleware(builder)
-        middleware.each { |c, a, b| builder.use(c, *a, &b) }
+        middleware.each { |c, a, kw, b| builder.use(c, *a, **kw, &b) }
       end
 
       def setup_logging(builder)
