@@ -163,6 +163,63 @@ class SettingsTest < Minitest::Test
     assert_equal :foo, @base.settings.environment
   end
 
+  describe 'set in the request scope' do
+    it 'is possible to change a setting from a route' do
+      @base.get('/') do
+        set :foo, 'bar'
+        settings.foo
+      end
+      @app = @base
+      get '/'
+      assert_equal 200, status
+      assert_equal 'bar', body
+    end
+
+    it 'is possible to change a setting from a before filter' do
+      @base.before { set :foo, 'bar' }
+      @base.get('/') { settings.foo }
+      @app = @base
+      get '/'
+      assert_equal 'bar', body
+    end
+
+    it 'is possible to change a setting from a helper' do
+      @base.helpers do
+        def change_setting
+          set :foo, 'bar'
+        end
+      end
+      @base.get('/') do
+        change_setting
+        settings.foo
+      end
+      @app = @base
+      get '/'
+      assert_equal 'bar', body
+    end
+
+    it 'is possible to enable and disable settings from a route' do
+      @base.get('/') do
+        enable :foo
+        disable :bar
+        "#{settings.foo?}/#{settings.bar?}"
+      end
+      @app = @base
+      get '/'
+      assert_equal 'true/false', body
+    end
+
+    it 'changes the setting on the application class, not just the instance' do
+      @base.get('/') do
+        set :foo, 'bar'
+        'ok'
+      end
+      @app = @base
+      get '/'
+      assert_equal 'bar', @base.foo
+    end
+  end
+
   describe 'default_content_type' do
     it 'defaults to html' do
       assert_equal 'text/html', @base.default_content_type

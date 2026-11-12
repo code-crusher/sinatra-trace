@@ -304,4 +304,41 @@ class StaticTest < Minitest::Test
     assert_match(/max-age=3600/, response['cache-control'])
   end
 
+  it 'can reassign public_folder at runtime from within a route' do
+    mock_app do
+      set :static, true
+      set :public_folder, __dir__
+
+      get '/hello+world.txt' do
+        set :public_folder, File.join(__dir__, 'public')
+        static!
+        'not found'
+      end
+    end
+
+    get '/hello+world.txt'
+
+    real_path = File.join(__dir__, 'public', 'hello+world.txt')
+    assert ok?
+    assert_equal File.read(real_path), body
+  end
+
+  it 'can reassign public_folder at runtime from a before filter' do
+    mock_app do
+      set :static, true
+      set :public_folder, __dir__
+
+      before('/hello+world.txt') do
+        set :public_folder, File.join(__dir__, 'public')
+        static!
+      end
+    end
+
+    get '/hello+world.txt'
+
+    real_path = File.join(__dir__, 'public', 'hello+world.txt')
+    assert ok?
+    assert_equal File.read(real_path), body
+  end
+
 end

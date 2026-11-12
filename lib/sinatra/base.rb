@@ -1023,6 +1023,25 @@ module Sinatra
       self.class.settings
     end
 
+    # Sets an option to the given value, just like Base.set, but usable from
+    # within routes, filters and helpers. This makes it possible to change
+    # settings, such as +public_folder+, at runtime.
+    def set(*args, &block)
+      settings.set(*args, &block)
+    end
+
+    # Same as calling <tt>set :option, true</tt> for each of the given
+    # options. See Base.enable.
+    def enable(*opts)
+      settings.enable(*opts)
+    end
+
+    # Same as calling <tt>set :option, false</tt> for each of the given
+    # options. See Base.disable.
+    def disable(*opts)
+      settings.disable(*opts)
+    end
+
     # Exit the current block, halts any further processing
     # of the request, and returns the specified response.
     def halt(*response)

@@ -1907,6 +1907,17 @@ get '/' do
 end
 ```
 
+Settings can also be changed at runtime, from within routes, filters or
+helpers, by calling `set` there. This is useful to, for example, serve files
+from a different `public_folder` depending on the request:
+
+```ruby
+get '/videos/*' do
+  set :public_folder, __dir__ + '/videos'
+  send_file File.join(settings.public_folder, params['splat'].first)
+end
+```
+
 ### Configuring attack protection
 
 Sinatra is using
