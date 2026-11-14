@@ -23,6 +23,26 @@ RSpec.describe Rack::Protection do
     expect(session).to be_empty
   end
 
+  it 'does not use SecFetchSite by default' do
+    mock_app do
+      use Rack::Protection
+      run DummyApp
+    end
+
+    post('/', {}, 'HTTP_SEC_FETCH_SITE' => 'cross-site')
+    expect(last_response).to be_ok
+  end
+
+  it 'allows enabling SecFetchSite with the :use option' do
+    mock_app do
+      use Rack::Protection, use: [:sec_fetch_site]
+      run DummyApp
+    end
+
+    post('/', {}, 'HTTP_SEC_FETCH_SITE' => 'cross-site')
+    expect(last_response).not_to be_ok
+  end
+
   it 'passes errors through if :reaction => :report is used' do
     mock_app do
       use Rack::Protection, reaction: :report

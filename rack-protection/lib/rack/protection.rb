@@ -20,6 +20,7 @@ module Rack
     autoload :ReferrerPolicy,        'rack/protection/referrer_policy'
     autoload :RemoteReferrer,        'rack/protection/remote_referrer'
     autoload :RemoteToken,           'rack/protection/remote_token'
+    autoload :SecFetchSite,          'rack/protection/sec_fetch_site'
     autoload :SessionHijacking,      'rack/protection/session_hijacking'
     autoload :StrictTransport,       'rack/protection/strict_transport'
     autoload :XSSHeader,             'rack/protection/xss_header'
@@ -41,6 +42,7 @@ module Rack
         use ::Rack::Protection::FormToken,             options if use_these.include? :form_token
         use ::Rack::Protection::ReferrerPolicy,        options if use_these.include? :referrer_policy
         use ::Rack::Protection::RemoteReferrer,        options if use_these.include? :remote_referrer
+        use ::Rack::Protection::SecFetchSite,          options if use_these.include? :sec_fetch_site
         use ::Rack::Protection::SessionHijacking,      options if use_these.include? :session_hijacking
         use ::Rack::Protection::StrictTransport,       options if use_these.include? :strict_transport
 

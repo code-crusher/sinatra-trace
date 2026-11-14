@@ -1,5 +1,7 @@
 ## Unreleased
 
+* New: Add `Rack::Protection::SecFetchSite` middleware, which rejects unsafe cross-site requests based on the `Sec-Fetch-Site` header ([#2153](https://github.com/sinatra/sinatra/issues/2153))
+
 ## 4.2.1 / 2025-10-10
 
 * Fix: Revert "`PATH_INFO` can never be empty" ([#2124](https://github.com/sinatra/sinatra/pull/2124))

@@ -104,6 +104,7 @@ Prevented by:
 * [`Rack::Protection::RemoteReferrer`][remote-referrer] (not included by `use Rack::Protection`)
 * [`Rack::Protection::RemoteToken`][remote-token]
 * [`Rack::Protection::HttpOrigin`][http-origin]
+* [`Rack::Protection::SecFetchSite`][sec-fetch-site] (not included by `use Rack::Protection`)
 
 ## Cross Site Scripting
 
@@ -176,6 +177,7 @@ The instrumenter is passed a namespace (String) and environment (Hash). The name
 [path-traversal]: http://www.sinatrarb.com/protection/path_traversal
 [remote-referrer]: http://www.sinatrarb.com/protection/remote_referrer
 [remote-token]: http://www.sinatrarb.com/protection/remote_token
+[sec-fetch-site]: https://github.com/sinatra/sinatra/blob/main/rack-protection/lib/rack/protection/sec_fetch_site.rb
 [session-hijacking]: http://www.sinatrarb.com/protection/session_hijacking
 [strict-transport]: http://www.sinatrarb.com/protection/strict_transport
 [xss-header]: http://www.sinatrarb.com/protection/xss_header
