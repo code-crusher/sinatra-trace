@@ -310,25 +310,59 @@ module Sinatra
 
       def parse_response
         cookies_from_response = Array(@response['Set-Cookie'])
-        return if @response_array == cookies_from_response
+        # Rack may mutate the same array in place when more cookies are
+        # added, so compare against a copy to avoid serving stale data.
+        return if @response_array == cookies_from_response.dup
 
         hash = {}
+        deleted = []
 
         cookies_from_response.each do |line|
           key, value = line.split(';', 2).first.to_s.split('=', 2)
           next if key.nil?
 
-          key = Rack::Utils.unescape(key)
-          if line =~ /expires=Thu, 01[-\s]Jan[-\s]1970/
-            @deleted << key
+          key = unescape_cookie_component(key)
+          if expired_cookie?(line)
+            deleted << key unless deleted.include?(key)
           else
-            @deleted.delete key
-            hash[key] = value
+            deleted.delete(key)
+            hash[key] = value.nil? ? nil : unescape_cookie_component(value)
           end
         end
 
+        @deleted = deleted
         @response_hash.replace hash
-        @response_array = cookies_from_response
+        @response_array = cookies_from_response.dup
+      end
+
+      # Rack escapes cookie names and values with Rack::Utils.escape,
+      # so decode them here. Never raise on malformed input, just
+      # return the raw component.
+      def unescape_cookie_component(value)
+        Rack::Utils.unescape(value)
+      rescue ArgumentError
+        value
+      end
+
+      # A Set-Cookie with an expiration in the past tells the browser
+      # to delete the cookie. Rack's delete_cookie uses an expires of
+      # 1 January 1970 and a max-age of 0.
+      def expired_cookie?(line)
+        if (max_age = line[/(?:^|;)\s*max-age\s*=\s*(-?\d+)/i, 1])
+          return max_age.to_i <= 0
+        end
+
+        expires = line[/(?:^|;)\s*expires\s*=\s*([^;]+)/i, 1]
+        return false if expires.nil?
+
+        expires = expires.strip
+        return true if expires =~ /\AThu, 01[-\s]Jan[-\s]1970/i
+
+        begin
+          Time.httpdate(expires) < Time.now
+        rescue ArgumentError
+          false
+        end
       end
 
       def request_cookies

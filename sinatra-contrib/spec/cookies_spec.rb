@@ -86,6 +86,57 @@ RSpec.describe Sinatra::Cookies do
         cookies['foo']
       end).to eq('baz')
     end
+
+    it 'returns the unescaped value of response cookies' do
+      expect(cookie_route do
+        response.set_cookie 'foo', 'hello world; bar'
+        cookies['foo']
+      end).to eq('hello world; bar')
+    end
+
+    it 'roundtrips a value set through the jar' do
+      expect(cookie_route do
+        cookies['foo'] = 'hello world; bar'
+        cookies['foo']
+      end).to eq('hello world; bar')
+    end
+
+    it 'sees cookies set after the response cookies were already read' do
+      expect(cookie_route do
+        cookies['foo'] = '1'
+        cookies['foo']                       # force a read of the response cookies
+        cookies['bar'] = '2'                 # appended to the same Set-Cookie array
+        cookies['baz'] = '3'                 # appended to the same Set-Cookie array
+        cookies['baz']
+      end).to eq('3')
+    end
+
+    it 'does not treat a max-age of zero as a live cookie' do
+      expect(cookie_route do
+        response.set_cookie 'foo', value: '', max_age: 0
+        cookies['foo']
+      end).to be_nil
+    end
+
+    it 'does not treat an expires date in the past as a live cookie' do
+      expect(cookie_route do
+        response.set_cookie 'foo', value: '', expires: Time.at(100_000_000)
+        cookies['foo']
+      end).to be_nil
+    end
+
+    it 'does not raise on a malformed percent escape in a cookie header' do
+      # rack-test cannot parse such a header, so exercise the Jar directly
+      # with a raw Set-Cookie header.
+      request = Rack::Request.new(Rack::MockRequest.env_for('http://example.org/'))
+      response = Rack::Response.new
+      response.set_header 'Set-Cookie', 'foo%zz=100%'
+      def request.secure?; false; end
+      app = Struct.new(:request, :response, :settings).new(request, response, {})
+      jar = Sinatra::Cookies::Jar.new(app)
+      expect { jar['foo%zz'] }.not_to raise_error
+      expect(jar['foo%zz']).to eq('100%')
+    end
   end
 
   describe :[]= do

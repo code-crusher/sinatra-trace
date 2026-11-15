@@ -1,5 +1,11 @@
 ## Unreleased
 
+* Fix: `Sinatra::Cookies` correctly parses `Set-Cookie` headers ([#2034](https://github.com/sinatra/sinatra/issues/2034))
+  * Cookie values are now unescaped (matching the escaping done by `Rack::Utils.escape` when setting them), instead of being returned percent-encoded
+  * Detect cookie deletion via `max-age=0` or an `expires` date in the past, not only via the 1970 epoch used by Rack's `delete_cookie`
+  * Fix a stale-cache bug where cookies appended to the `Set-Cookie` header after an earlier read were invisible for the rest of the request
+  * Avoid raising `ArgumentError` when a cookie name or value contains an invalid percent escape
+
 ## 4.2.1 / 2025-10-10
 
 * Fix: Revert "`PATH_INFO` can never be empty" ([#2124](https://github.com/sinatra/sinatra/pull/2124))
