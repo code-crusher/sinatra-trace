@@ -1930,6 +1930,16 @@ You can also hand in an array in order to disable a list of protections:
 set :protection, :except => [:path_traversal, :remote_token]
 ```
 
+When a protection detects a malicious request, it rejects the request with a
+403 response. If you want a different behavior, set the `:reaction` option.
+For instance, `:drop_session` empties the session but lets the request pass
+to the application, and `:report` lets the request pass and marks it with
+`env['protection.failed']`:
+
+```ruby
+set :protection, :reaction => :drop_session
+```
+
 By default, Sinatra will only set up session based protection if `:sessions`
 have been enabled. See '[Using Sessions](#using-sessions)'. Sometimes you may want to set up
 sessions "outside" of the Sinatra app, such as in the config.ru or with a
@@ -2061,6 +2071,13 @@ set :protection, :session => true
     <dd>
       Whether or not to enable web attack protections. See protection section
       above.
+    </dd>
+    <dd>
+      When enabled, each protection rejects malicious requests with a 403
+      response, using the reaction it deems appropriate for the attack it
+      prevents. Set the <tt>:reaction</tt> option to change this behavior, for
+      instance to <tt>:drop_session</tt> to only drop the session while letting
+      the request pass to the application.
     </dd>
 
   <dt>public_dir</dt>

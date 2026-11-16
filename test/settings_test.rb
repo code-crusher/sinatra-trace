@@ -650,5 +650,34 @@ class SettingsTest < Minitest::Test
         assert_include MiddlewareTracker.used, Rack::Protection::RemoteToken
       end
     end
+
+    it 'does not pass a default reaction to Rack::Protection' do
+      # each middleware picks the default reaction appropriate for the attack
+      # it prevents (usually denying the request with a 403)
+      options = track_protection_options { Sinatra.new.new }
+      assert_nil options[:reaction]
+    end
+
+    it 'passes a custom reaction to Rack::Protection' do
+      options = track_protection_options do
+        Sinatra.new { set :protection, :reaction => :drop_session }.new
+      end
+      assert_equal :drop_session, options[:reaction]
+    end
+
+    def track_protection_options
+      captured = nil
+      protection = Rack::Protection.singleton_class
+      new_method = protection.instance_method(:new)
+      protection.send :define_method, :new do |app, options = {}|
+        captured = options.dup
+        new_method.bind(self).call(app, options)
+      end
+      yield
+      refute_nil captured
+      captured
+    ensure
+      protection.send :define_method, :new, new_method
+    end
   end
 end

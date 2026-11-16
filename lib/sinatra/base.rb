@@ -1868,8 +1868,12 @@ module Sinatra
         protect_session = options.fetch(:session) { sessions? }
         options[:without_session] = !protect_session
 
-        options[:reaction] ||= :drop_session
-
+        # Each middleware knows which default reaction suits the attack it
+        # prevents, so unless the application opts in to another reaction, do
+        # not override the one chosen by the middleware. This makes the
+        # default-on protections actually reject malicious requests (with a
+        # 403), instead of merely dropping the session and letting the request
+        # through to the application.
         builder.use Rack::Protection, options
       end
 

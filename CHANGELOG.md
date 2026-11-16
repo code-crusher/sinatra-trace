@@ -1,5 +1,9 @@
 ## Unreleased
 
+* Security: Default-on `Rack::Protection` middlewares now reject malicious requests with a 403 response instead of only dropping the session and letting the request pass to the application ([#2012](https://github.com/sinatra/sinatra/issues/2012))
+  * Each protection uses the default reaction it deems appropriate; the previous global `:drop_session` default made protections like `HttpOrigin` or `IPSpoofing` ineffective.
+  * To restore the old behavior, use `set :protection, :reaction => :drop_session`.
+
 ## 4.2.1 / 2025-10-10
 
 * Fix: Revert "`PATH_INFO` can never be empty" ([#2124](https://github.com/sinatra/sinatra/pull/2124))
