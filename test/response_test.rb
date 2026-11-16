@@ -62,6 +62,47 @@ class ResponseTest < Minitest::Test
     assert @response.finish
   end
 
+  it 'keeps the Content-Length header when a body is assigned to a fresh response' do
+    @response['Content-Length'] = '5'
+    @response.body = 'Hello'
+    _, headers, = @response.finish
+    assert_equal '5', headers['content-length']
+  end
+
+  it 'invalidates the Content-Length header when the body is replaced' do
+    @response.body = 'Hello'
+    @response['Content-Length'] = '5'
+    @response.body = 'Goodbye'
+    _, headers, = @response.finish
+    assert_equal '7', headers['content-length']
+  end
+
+  it 'invalidates the Content-Length header when a written body is replaced' do
+    @response.write 'Hello'
+    @response['Content-Length'] = '5'
+    @response.body = 'Hi'
+    _, headers, = @response.finish
+    assert_equal '2', headers['content-length']
+  end
+
+  it 'keeps the Content-Length header when assigning the same body object' do
+    stream = Object.new
+    def stream.each; end
+    @response.body = stream
+    @response['Content-Length'] = '46'
+    @response.body = stream
+    _, headers, = @response.finish
+    assert_equal '46', headers['content-length']
+  end
+
+  it 'calculates the Content-Length header when the body is replaced with an empty one' do
+    @response.body = 'Hello'
+    @response['Content-Length'] = '5'
+    @response.body = ''
+    _, headers, = @response.finish
+    assert_equal '0', headers['content-length']
+  end
+
   it 'does not nest a Sinatra::Response' do
     @response.body = Sinatra::Response.new ["foo"]
     assert_same_body @response.body, ["foo"]

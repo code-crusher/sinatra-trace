@@ -171,8 +171,13 @@ module Sinatra
   class Response < Rack::Response
     DROP_BODY_RESPONSES = [204, 304].freeze
 
+    # Replacing the body invalidates a `content-length` header set for the
+    # previous body, so that it is recalculated in #finish. Assigning a body
+    # to a fresh response keeps the header, so applications may set both
+    # together (see issue #2025).
     def body=(value)
       value = value.body while Rack::Response === value
+      invalidate_content_length unless value.equal?(@body)
       @body = String === value ? [value.to_str] : value
     end
 
@@ -203,6 +208,10 @@ module Sinatra
     end
 
     private
+
+    def invalidate_content_length
+      headers.delete 'content-length' if !@body.nil? && (!@body.respond_to?(:empty?) || !@body.empty?)
+    end
 
     def calculate_content_length?
       headers['content-type'] && !headers['content-length'] && (Array === body)
@@ -297,9 +306,6 @@ module Sinatra
         def block.each; yield(call) end
         response.body = block
       elsif value
-        unless request.head? || value.is_a?(Rack::Files::BaseIterator) || value.is_a?(Stream)
-          headers.delete 'content-length'
-        end
         response.body = value
       else
         response.body
@@ -1222,6 +1228,10 @@ module Sinatra
 
       http_status = 500 unless http_status&.between?(400, 599)
       status(http_status)
+
+      # The body is about to be replaced by the error body, so any
+      # content-length set for the failed response is stale (issue #608).
+      headers.delete 'content-length'
 
       if server_error?
         dump_errors! boom if settings.dump_errors?

@@ -174,6 +174,33 @@ class RoutingTest < Minitest::Test
     assert_equal 404, status
   end
 
+  it "recalculates body length correctly when the body is replaced" do
+    mock_app {
+      get '/' do
+        response.write "This body will be replaced"
+        body "tiny"
+      end
+    }
+
+    get "/"
+    assert_equal "4", response["Content-Length"]
+    assert_equal "tiny", body
+  end
+
+  it "does not delete the content-length header when body and header are set together" do
+    mock_app {
+      get '/' do
+        content_type 'text/plain'
+        headers['content-length'] = '5'
+        body 'hello'
+      end
+    }
+
+    get "/"
+    assert_equal '5', response['Content-Length']
+    assert_equal 'hello', body
+  end
+
   it "captures the exception message of a raised NotFound" do
     mock_app {
       get '/' do
