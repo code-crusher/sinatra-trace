@@ -68,7 +68,7 @@ module Sinatra
     end
 
     def safe?
-      get? || head? || options? || trace?
+      get? || head? || options? || trace? || track?
     end
 
     def idempotent?
@@ -81,6 +81,10 @@ module Sinatra
 
     def unlink?
       request_method == 'UNLINK'
+    end
+
+    def track?
+      request_method == 'TRACK'
     end
 
     def params
@@ -1552,6 +1556,10 @@ module Sinatra
 
       def unlink(path, opts = {}, &block)  route 'UNLINK',  path, opts, &block end
 
+      def trace(path, opts = {}, &block)   route 'TRACE',   path, opts, &block end
+
+      def track(path, opts = {}, &block)   route 'TRACK',   path, opts, &block end
+
       # Makes the methods defined in the block and in the Modules given
       # in `extensions` available to the handlers and templates
       def helpers(*extensions, &block)
@@ -2115,6 +2123,7 @@ module Sinatra
     end
 
     delegate :get, :patch, :put, :post, :delete, :head, :options, :link, :unlink,
+             :trace, :track,
              :template, :layout, :before, :after, :error, :not_found, :configure,
              :set, :mime_type, :enable, :disable, :use, :development?, :test?,
              :production?, :helpers, :settings, :register, :on_start, :on_stop

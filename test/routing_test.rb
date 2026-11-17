@@ -16,7 +16,7 @@ class PatternLookAlike
 end
 
 class RoutingTest < Minitest::Test
-  %w[get put post delete options patch link unlink].each do |verb|
+  %w[get put post delete options patch link unlink trace track].each do |verb|
     it "defines #{verb.upcase} request handlers with #{verb}" do
       mock_app {
         send verb, '/hello' do

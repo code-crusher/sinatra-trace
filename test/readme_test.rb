@@ -26,6 +26,10 @@ class ReadmeTest < Minitest::Test
         link('/') { ".. affiliate something .." }
 
         unlink('/') { ".. separate something .." }
+
+        trace('/') { ".. echo something .." }
+
+        track('/') { ".. follow something .." }
       end
 
       get '/'
@@ -51,6 +55,12 @@ class ReadmeTest < Minitest::Test
 
       unlink '/'
       assert_body '.. separate something ..'
+
+      trace '/'
+      assert_body '.. echo something ..'
+
+      track '/'
+      assert_body '.. follow something ..'
     end
 
     example do

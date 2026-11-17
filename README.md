@@ -154,6 +154,14 @@ end
 unlink '/' do
   .. separate something ..
 end
+
+trace '/' do
+  .. echo something ..
+end
+
+track '/' do
+  .. follow something ..
+end
 ```
 
 Routes are matched in the order they are defined. The first route that

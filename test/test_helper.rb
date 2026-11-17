@@ -124,6 +124,14 @@ class Minitest::Test
     request(uri, env.merge(:method => "UNLINK", :params => params), &block)
   end
 
+  def trace(uri, params = {}, env = {}, &block)
+    request(uri, env.merge(:method => "TRACE", :params => params), &block)
+  end
+
+  def track(uri, params = {}, env = {}, &block)
+    request(uri, env.merge(:method => "TRACK", :params => params), &block)
+  end
+
   # Delegate other missing methods to response.
   def method_missing(name, *args, &block)
     if response && response.respond_to?(name)

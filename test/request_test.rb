@@ -54,6 +54,20 @@ class RequestTest < Minitest::Test
     assert request.secure?
   end
 
+  it 'recognizes TRACE requests' do
+    request = Sinatra::Request.new('REQUEST_METHOD' => 'TRACE')
+    assert request.trace?
+    assert request.safe?
+    assert request.idempotent?
+  end
+
+  it 'recognizes TRACK requests' do
+    request = Sinatra::Request.new('REQUEST_METHOD' => 'TRACK')
+    assert request.track?
+    assert request.safe?
+    assert request.idempotent?
+  end
+
   it 'is possible to marshal params' do
     request = Sinatra::Request.new(
       'REQUEST_METHOD' => 'PUT',
