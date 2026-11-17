@@ -188,6 +188,12 @@ module Sinatra
         headers.delete 'content-type'
       end
 
+      # A streaming body has no knowable length and is framed by the server
+      # (chunked encoding, or closing the connection). Strip a Content-Length
+      # the app hand-set -- even after the stream call, e.g. in an after
+      # filter -- as a stale one corrupts keep-alive connections.
+      headers.delete 'content-length' if streaming_body?
+
       if drop_body?
         close
         result = []
@@ -206,6 +212,11 @@ module Sinatra
 
     def calculate_content_length?
       headers['content-type'] && !headers['content-length'] && (Array === body)
+    end
+
+    # A Rack 3 streaming body: a callable that does not respond to #each.
+    def streaming_body?
+      body.respond_to?(:call) && !body.respond_to?(:each)
     end
 
     def drop_content_info?
@@ -297,7 +308,11 @@ module Sinatra
         def block.each; yield(call) end
         response.body = block
       elsif value
-        unless request.head? || value.is_a?(Rack::Files::BaseIterator) || value.is_a?(Stream)
+        if value.is_a?(Stream)
+          # A stream is framed by the server, so it must not carry a
+          # Content-Length some other code has set before the stream call.
+          headers.delete 'content-length'
+        elsif !(request.head? || value.is_a?(Rack::Files::BaseIterator))
           headers.delete 'content-length'
         end
         response.body = value
@@ -449,46 +464,61 @@ module Sinatra
 
     # Class of the response body in case you use #stream.
     #
-    # Three things really matter: The front and back block (back being the
-    # block generating content, front the one sending it to the client) and
-    # the scheduler, integrating with whatever concurrency feature the Rack
-    # handler is using.
+    # It is a Rack 3 "callable body": it responds to #call (deliberately not
+    # to #each, which would make the server treat it as an Enumerable body),
+    # so the server hands it the connection stream and the block passed to
+    # #stream can start sending data to the client right away, even though
+    # later parts of the response body have not yet been generated. Writes go
+    # directly to the stream the server provides:
+    # https://github.com/rack/rack/blob/main/UPGRADE-GUIDE.md#response-bodies-can-be-used-for-bi-directional-streaming
     #
-    # Scheduler has to respond to defer and schedule.
+    # The close parameter specifies whether Stream#close should be called
+    # after the block has been executed.
     class Stream
-      def self.schedule(*) yield end
-      def self.defer(*)    yield end
-
-      def initialize(scheduler = self.class, keep_open = false, &back)
+      def initialize(keep_open = false, &back)
         @back = back.to_proc
-        @scheduler = scheduler
         @keep_open = keep_open
         @callbacks = []
         @closed = false
+        @mutex = Mutex.new
+        @cond = ConditionVariable.new
+      end
+
+      # Called by the server with the connection stream. Runs the block
+      # passed to #stream against it. If the stream is to be kept open,
+      # parks the server thread until #close is called from elsewhere
+      # (another thread, another request).
+      def call(stream)
+        @stream = stream
+        @back.call(self)
+        wait_until_closed if @keep_open
+      ensure
+        close
       end
 
       def close
-        return if closed?
+        callbacks = nil
+        @mutex.synchronize do
+          return if @closed
 
-        @closed = true
-        @scheduler.schedule { @callbacks.each { |c| c.call } }
-      end
-
-      def each(&front)
-        @front = front
-        @scheduler.defer do
-          begin
-            @back.call(self)
-          rescue Exception => e
-            @scheduler.schedule { raise e }
-          ensure
-            close unless @keep_open
-          end
+          @closed = true
+          callbacks = @callbacks
+          @callbacks = []
+          # Wake up a parked keep_open #call.
+          @cond.broadcast
         end
+        # Tell the server we are done writing, so it can finish the
+        # response (e.g. write the terminating chunk).
+        begin
+          @stream.close if @stream.respond_to?(:close)
+        rescue Errno::EPIPE, Errno::ECONNRESET, IOError
+          # The client is gone; nothing left to close.
+        end
+        callbacks.each { |c| c.call }
       end
 
       def <<(data)
-        @scheduler.schedule { @front.call(data.to_s) }
+        @stream.write(data.to_s) unless closed?
         self
       end
 
@@ -503,6 +533,12 @@ module Sinatra
       def closed?
         @closed
       end
+
+      private
+
+      def wait_until_closed
+        @mutex.synchronize { @cond.wait(@mutex) until @closed }
+      end
     end
 
     # Allows to start sending data to the client even though later parts of
@@ -511,17 +547,8 @@ module Sinatra
     # The close parameter specifies whether Stream#close should be called
     # after the block has been executed.
     def stream(keep_open = false)
-      scheduler = env['async.callback'] ? EventMachine : Stream
-      current   = @params.dup
-      stream = if scheduler == Stream  && keep_open
-        Stream.new(scheduler, false) do |out|
-          until out.closed?
-            with_params(current) { yield(out) }
-          end
-        end
-      else
-        Stream.new(scheduler, keep_open) { |out| with_params(current) { yield(out) } }
-      end
+      current = @params.dup
+      stream  = Stream.new(keep_open) { |out| with_params(current) { yield(out) } }
       body stream
     end
 

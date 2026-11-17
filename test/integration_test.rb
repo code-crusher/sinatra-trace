@@ -63,8 +63,14 @@ class IntegrationTest < Minitest::Test
     assert response['Content-Length']
   end
 
-  it "doesn't ignore Content-Length header when streaming" do
+  # With the Rack 3 callable streaming body the server owns framing, so
+  # Sinatra must strip a hand-set Content-Length on a streamed response
+  # (the /streaming route sets one deliberately): a stale Content-Length
+  # corrupts keep-alive connections.
+  it "strips a hand-set Content-Length header when streaming" do
+    expected = "It's gonna be legen -\n (wait for it) \n- dary!\n"
     response = server.get_response '/streaming'
-    assert_equal '46', response['Content-Length']
+    assert_equal expected, response.body
+    refute response['Content-Length']
   end
 end

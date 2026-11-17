@@ -19,7 +19,8 @@ class StreamingTest < Minitest::Test
 
   it 'always yields strings' do
     stream = Stream.new { |out| out << :foo }
-    stream.each { |str| assert_equal 'foo', str }
+    stream.call(sink = StringIO.new)
+    assert_equal 'foo', sink.string
   end
 
   it 'postpones body generation' do
@@ -32,28 +33,29 @@ class StreamingTest < Minitest::Test
       end
     end
 
-    stream.each do |s|
-      assert_equal s, step.to_s
-      step += 1
-    end
+    stream.call(sink = StringIO.new)
+    assert_equal '0123456789', sink.string
   end
 
   it 'calls the callback after it is done' do
     step   = 0
     final  = 0
-    stream = Stream.new { |_| 10.times { step += 1 }}
+    stream = Stream.new { |_| 10.times { step += 1 } }
     stream.callback { final = step }
-    stream.each {|_|}
+    stream.call(StringIO.new)
     assert_equal 10, final
   end
 
   it 'does not trigger the callback if close is set to :keep_open' do
     step   = 0
     final  = 0
-    stream = Stream.new(Stream, :keep_open) { |_| 10.times { step += 1 } }
+    stream = Stream.new(:keep_open) { |_| 10.times { step += 1 } }
     stream.callback { final = step }
-    stream.each {|_|}
+    thread = Thread.new { stream.call(StringIO.new) }
+    sleep 0.1
     assert_equal 0, final
+    stream.close
+    thread.join
   end
 
   it 'allows adding more than one callback' do
@@ -61,56 +63,42 @@ class StreamingTest < Minitest::Test
     stream = Stream.new { }
     stream.callback { a = true }
     stream.callback { b = true }
-    stream.each {|_| }
+    stream.call(StringIO.new)
     assert a, 'should trigger first callback'
     assert b, 'should trigger second callback'
   end
 
-  class MockScheduler
-    def initialize(*)     @schedule, @defer = [], []                end
-    def schedule(&block)  @schedule << block                        end
-    def defer(&block)     @defer    << block                        end
-    def schedule!(*)      @schedule.pop.call until @schedule.empty? end
-    def defer!(*)         @defer.pop.call    until @defer.empty?    end
+  it 'is a Rack 3 callable streaming body' do
+    stream = Stream.new { |out| out << 'foo' }
+    assert_respond_to stream, :call
+    refute_respond_to stream, :each, 'must not respond to #each, or servers ' \
+      'would treat it as an Enumerable body instead of a streaming body'
+    refute_respond_to stream, :to_ary
   end
 
-  it 'allows dropping in another scheduler' do
-    scheduler  = MockScheduler.new
-    processing = sending = done = false
-
-    stream = Stream.new(scheduler) do |out|
-      processing = true
-      out << :foo
-    end
-
-    stream.each { sending = true}
-    stream.callback { done = true }
-
-    scheduler.schedule!
-    assert !processing
-    assert !sending
-    assert !done
-
-    scheduler.defer!
-    assert processing
-    assert !sending
-    assert !done
-
-    scheduler.schedule!
-    assert sending
-    assert done
+  it 'is consumed via #call with the stream the server provides' do
+    ran = false
+    stream = Stream.new { |out| out << 'foo' }
+    stream.call(sink = StringIO.new) { ran = true }
+    assert_equal 'foo', sink.string
   end
 
-  it 'schedules exceptions to be raised on the main thread/event loop/...' do
-    scheduler = MockScheduler.new
-    Stream.new(scheduler) { fail 'should be caught' }.each { }
-    scheduler.defer!
-    assert_raises(RuntimeError) { scheduler.schedule! }
+  it 'closes the stream when the block finishes' do
+    stream = Stream.new { |out| out << 'foo' }
+    stream.call(sink = StringIO.new)
+    assert stream.closed?
+    assert_equal 'foo', sink.string
+  end
+
+  it 'closes the stream even if the block raises' do
+    stream = Stream.new { |out| out << 'foo'; raise 'should be caught' }
+    assert_raises(RuntimeError) { stream.call(StringIO.new) }
+    assert stream.closed?
   end
 
   it 'does not trigger an infinite loop if you call close in a callback' do
-    stream = Stream.new { |out| out.callback { out.close }}
-    stream.each { |_| }
+    stream = Stream.new { |out| out.callback { out.close } }
+    stream.call(StringIO.new)
   end
 
   it 'gives access to route specific params' do
@@ -121,6 +109,18 @@ class StreamingTest < Minitest::Test
     end
     get '/foo'
     assert_body 'foo'
+  end
+
+  it 'parks a keep_open stream until it is closed from another thread' do
+    stream = Stream.new(:keep_open) { |out| out << 'hi!' }
+    sink = StringIO.new
+    thread = Thread.new { stream.call(sink) }
+    sleep 0.1
+    assert_equal 'hi!', sink.string
+    refute stream.closed?, 'stream should be kept open'
+    stream.close
+    thread.join
+    assert stream.closed?
   end
 
   it 'sets up async.close if available' do
@@ -138,11 +138,12 @@ class StreamingTest < Minitest::Test
       end
     end
     get '/'
+    body # consume the streaming body, as a server would
     assert ran
   end
 
   it 'has a public interface to inspect its open/closed state' do
-    stream = Stream.new(Stream) { |out| out << :foo }
+    stream = Stream.new { |out| out << :foo }
     assert !stream.closed?
     stream.close
     assert stream.closed?
