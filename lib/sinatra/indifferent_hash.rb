@@ -17,23 +17,28 @@ module Sinatra
   #   rgb[:white]  # => '#FFFFFF' # symbol retrieval
   #   rgb['white'] # => '#FFFFFF' # string retrieval
   #
-  # Internally, symbols are mapped to strings when used as keys in the entire
+  # Internally, strings are mapped to symbols when used as keys in the entire
   # writing interface (calling e.g. <tt>[]=</tt>, <tt>merge</tt>). This mapping
   # belongs to the public interface. For example, given:
   #
   #   hash = Sinatra::IndifferentHash.new
-  #   hash[:a] = 1
+  #   hash['a'] = 1
   #
-  # You are guaranteed that the key is returned as a string:
+  # You are guaranteed that the key is returned as a symbol:
   #
-  #   hash.keys # => ["a"]
+  #   hash.keys # => [:a]
+  #
+  # This is what allows the hash to be splatted into keyword arguments:
+  #
+  #   def some_method(a:); end
+  #   some_method(**hash) # => 1
   #
   # Technically other types of keys are accepted:
   #
   #   hash = Sinatra::IndifferentHash
   #   hash[:a] = 1
   #   hash[0] = 0
-  #   hash # => { "a"=>1, 0=>0 }
+  #   hash # => { :a=>1, 0=>0 }
   #
   # But this class is intended for use cases where strings or symbols are the
   # expected keys and it is convenient to understand both as the same. For
@@ -191,7 +196,11 @@ module Sinatra
     private
 
     def convert_key(key)
-      key.is_a?(Symbol) ? key.to_s : key
+      key.is_a?(String) ? key.to_sym : key
+    rescue EncodingError
+      # Strings with invalid encoding can't be symbolized; keep them as they
+      # are rather than raising, since they may come straight from a request.
+      key
     end
 
     def convert_value(value)

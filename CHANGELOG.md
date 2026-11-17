@@ -1,5 +1,11 @@
 ## Unreleased
 
+* Fix: `Sinatra::IndifferentHash` now stores keys as Symbols instead of Strings, so `params` can be
+  splatted into keyword arguments (`some_method(**params)`) ([#1592](https://github.com/sinatra/sinatra/issues/1592))
+  * Breaking change: `#keys` and `#to_h` now return Symbols for string keys. Use string access
+    (`params['name']`) as before, or call `#to_s` on the keys if you need Strings.
+  * Keys that can't be symbolized (e.g. Strings with invalid encoding) are stored unchanged.
+
 ## 4.2.1 / 2025-10-10
 
 * Fix: Revert "`PATH_INFO` can never be empty" ([#2124](https://github.com/sinatra/sinatra/pull/2124))

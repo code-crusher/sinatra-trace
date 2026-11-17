@@ -327,6 +327,19 @@ class RoutingTest < Minitest::Test
     assert_equal 'Given: foo', body
   end
 
+  it "can be splatted into keyword arguments" do
+    helper = Class.new { def call(foo:, bar:) = [foo, bar] }.new
+    mock_app {
+      get '/:foo' do
+        assert_equal ['bar', 'baz'], helper.call(**params)
+        'well, alright'
+      end
+    }
+    get '/bar?bar=baz'
+    assert ok?
+    assert_equal 'well, alright', body
+  end
+
   it "merges named params and query string params in params" do
     mock_app {
       get '/:foo' do
@@ -594,7 +607,7 @@ class RoutingTest < Minitest::Test
   end
 
   it "supports deeply nested params" do
-    expected_params = {
+    sent_params = {
       "emacs" => {
         "map"     => { "goto-line" => "M-g g" },
         "version" => "22.3.1"
@@ -605,13 +618,26 @@ class RoutingTest < Minitest::Test
       },
       "paste" => {"name"=>"hello world", "syntax"=>"ruby"}
     }
+    expected_params = {
+      emacs: {
+        map:     { :"goto-line" => "M-g g" },
+        version: "22.3.1"
+      },
+      browser: {
+        firefox: { engine: { name: "spidermonkey", version: "1.7.0" } },
+        chrome:  { engine: { name: "V8", version: "1.0" } }
+      },
+      paste: { name: "hello world", syntax: "ruby" }
+    }
     mock_app {
       get '/foo' do
         assert_equal expected_params, params
+        # String access keeps working, even for nested hashes
+        assert_equal "M-g g", params["emacs"]["map"]["goto-line"]
         'looks good'
       end
     }
-    get '/foo', expected_params
+    get '/foo', sent_params
     assert ok?
     assert_equal 'looks good', body
   end
