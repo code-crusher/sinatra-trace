@@ -1332,6 +1332,9 @@ end
 The route block is immediately exited and control continues with the next
 matching route. If no matching route is found, a 404 is returned.
 
+Any status code and headers set by the route before passing are discarded, so
+the next route starts from the response state the passing route inherited.
+
 ### Triggering Another Route
 
 Sometimes `pass` is not what you want, instead, you would like to get the

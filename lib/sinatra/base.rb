@@ -982,7 +982,6 @@ module Sinatra
       super()
       @app = app
       @template_cache = TemplateCache.new
-      @pinned_response = nil # whether a before! filter pinned the content-type
       yield self if block_given?
     end
 
@@ -996,7 +995,6 @@ module Sinatra
       @params   = IndifferentHash.new
       @request  = Request.new(env)
       @response = Response.new
-      @pinned_response = nil
       template_cache.clear if settings.reload_templates
 
       invoke { dispatch! }
@@ -1051,13 +1049,9 @@ module Sinatra
     private
 
     # Run filters defined on the class and all superclasses.
-    # Accepts an optional block to call after each filter is applied.
-    def filter!(type, base = settings, &block)
-      filter!(type, base.superclass, &block) if base.superclass.respond_to?(:filters)
-      base.filters[type].each do |args|
-        result = process_route(*args)
-        block.call(result) if block_given?
-      end
+    def filter!(type, base = settings)
+      filter!(type, base.superclass) if base.superclass.respond_to?(:filters)
+      base.filters[type].each { |args| process_route(*args) }
     end
 
     # Run routes defined on the class and all superclasses.
@@ -1065,8 +1059,6 @@ module Sinatra
       routes = base.routes[@request.request_method]
 
       routes&.each do |pattern, conditions, block|
-        response.delete_header('content-type') unless @pinned_response
-
         returned_pass_block = process_route(pattern, conditions) do |*args|
           env['sinatra.route'] = "#{@request.request_method} #{pattern}"
           route_eval { block[*args] }
@@ -1116,10 +1108,21 @@ module Sinatra
         values += params.values.flatten
       end
 
-      catch(:pass) do
+      # Snapshot the response so a route that passes leaves no trace: the next
+      # handler starts from the state this route found. Rolling back only on
+      # :pass matters -- before filters, after filters and error handlers all run
+      # through here too, and must keep the state they set when they return.
+      original_headers = response.headers.dup
+      original_status  = response.status
+
+      pass_block = catch(:pass) do
         conditions.each { |c| throw :pass if c.bind(self).call == false }
-        block ? block[self, values] : yield(self, values)
+        return block ? block[self, values] : yield(self, values)
       end
+
+      response.headers.replace(original_headers)
+      response.status = original_status
+      pass_block
     rescue StandardError
       @env['sinatra.error.params'] = @params
       raise
@@ -1189,9 +1192,7 @@ module Sinatra
 
       invoke do
         static! if settings.static? && (request.get? || request.head?)
-        filter! :before do
-          @pinned_response = !response['content-type'].nil?
-        end
+        filter! :before
         route!
       end
     rescue ::Exception => e

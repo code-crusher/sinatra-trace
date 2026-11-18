@@ -843,6 +843,164 @@ class RoutingTest < Minitest::Test
     assert_equal 'Hello World', body
   end
 
+  it "rolls back headers set by a passed route" do
+    mock_app {
+      get '/:foo' do
+        headers['X-Foo'] = 'bar'
+        pass
+      end
+
+      get '/*' do
+        'Hello World'
+      end
+    }
+
+    get '/bar'
+    assert ok?
+    assert_nil response.headers['X-Foo']
+    assert_equal 'Hello World', body
+  end
+
+  it "rolls back content type set by a passed route" do
+    mock_app {
+      get '/:foo' do
+        content_type :json
+        pass
+      end
+
+      get '/*' do
+        'Hello World'
+      end
+    }
+
+    get '/bar'
+    assert ok?
+    assert_equal 'text/html;charset=utf-8', response.headers['Content-Type']
+    assert_equal 'Hello World', body
+  end
+
+  it "rolls back status set by a passed route" do
+    mock_app {
+      get '/:foo' do
+        status 201
+        pass
+      end
+
+      get '/*' do
+        'Hello World'
+      end
+    }
+
+    get '/bar'
+    assert ok?
+    assert_equal 200, status
+    assert_equal 'Hello World', body
+  end
+
+  it "rolls back response state set by a passed route for non-GET verbs" do
+    mock_app {
+      post '/:foo' do
+        content_type :json
+        headers['X-Foo'] = 'bar'
+        status 201
+        pass
+      end
+
+      post '/*' do
+        'Hello World'
+      end
+    }
+
+    post '/bar'
+    assert ok?
+    assert_equal 200, status
+    assert_nil response.headers['X-Foo']
+    assert_equal 'text/html;charset=utf-8', response.headers['Content-Type']
+    assert_equal 'Hello World', body
+  end
+
+  it "rolls back response state before running the block passed to pass" do
+    mock_app {
+      get '/' do
+        headers['X-Foo'] = 'bar'
+        status 201
+        pass { 'fallback' }
+      end
+    }
+
+    get '/'
+    assert ok?
+    assert_equal 200, status
+    assert_nil response.headers['X-Foo']
+    assert_equal 'fallback', body
+  end
+
+  it "keeps response state set by a route that does not pass" do
+    mock_app {
+      get '/' do
+        headers['X-Foo'] = 'bar'
+        status 201
+        'Hello World'
+      end
+    }
+
+    get '/'
+    assert_equal 201, status
+    assert_equal 'bar', response.headers['X-Foo']
+    assert_equal 'Hello World', body
+  end
+
+  it "keeps response state set by before filters when a route passes" do
+    mock_app {
+      before { headers['X-Before'] = 'yes' }
+      get '/:foo' do
+        pass
+      end
+      get '/*' do
+        'Hello World'
+      end
+    }
+
+    get '/bar'
+    assert ok?
+    assert_equal 'yes', response.headers['X-Before']
+    assert_equal 'Hello World', body
+  end
+
+  it "keeps content type pinned by a superclass before filter when a route passes" do
+    base = Class.new(Sinatra::Base)
+    base.before { content_type :json }
+    mock_app(base) do
+      get('/:foo') { pass }
+      get('/*') { '{"foo":"bar"}' }
+    end
+
+    get '/bar'
+    assert ok?
+    assert_equal 'application/json', response.headers['Content-Type']
+    assert_equal '{"foo":"bar"}', body
+  end
+
+  it "rolls back response state set by conditions when a route passes" do
+    mock_app {
+      condition do
+        headers['X-Condition'] = 'yes'
+        true
+      end
+      get '/:foo' do
+        pass
+      end
+      get '/*' do
+        'Hello World'
+      end
+    }
+
+    get '/bar'
+    assert ok?
+    assert_nil response.headers['X-Condition']
+    assert_equal 'Hello World', body
+  end
+
   it "makes original request params available in error handler" do
     mock_app {
       disable :raise_errors
