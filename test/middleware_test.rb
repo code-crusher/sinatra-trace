@@ -107,4 +107,30 @@ class MiddlewareTest < Minitest::Test
     @app.use KeywordArgumentInitializationMiddleware, argument: "argument"
     get '/'
   end
+
+  it "instantiates middleware only once when requests are served concurrently" do
+    instantiations = 0
+    counter_mutex  = Mutex.new
+    middleware = Class.new(MockMiddleware) do
+      define_method(:initialize) do |app|
+        # Give other threads a chance to race on the lazy prototype build
+        sleep 0.05
+        counter_mutex.synchronize { instantiations += 1 }
+        super(app)
+      end
+    end
+    @app.use middleware
+
+    gate = Queue.new
+    threads = 8.times.map do
+      Thread.new do
+        gate.pop
+        Rack::MockRequest.new(@app).get('/')
+      end
+    end
+    8.times { gate << true }
+    threads.each(&:join)
+
+    assert_equal 1, instantiations
+  end
 end

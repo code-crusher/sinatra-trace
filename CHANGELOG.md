@@ -1,5 +1,7 @@
 ## Unreleased
 
+* Fix: Build the middleware pipeline only once when requests are served concurrently ([#1102](https://github.com/sinatra/sinatra/issues/1102))
+
 ## 4.2.1 / 2025-10-10
 
 * Fix: Revert "`PATH_INFO` can never be empty" ([#2124](https://github.com/sinatra/sinatra/pull/2124))

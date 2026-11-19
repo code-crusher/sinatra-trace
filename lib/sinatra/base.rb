@@ -1309,13 +1309,14 @@ module Sinatra
       # Removes all routes, filters, middleware and extension hooks from the
       # current class (not routes/filters/... defined by its superclass).
       def reset!
-        @conditions     = []
-        @routes         = {}
-        @filters        = { before: [], after: [] }
-        @errors         = {}
-        @middleware     = []
-        @prototype      = nil
-        @extensions     = []
+        @conditions      = []
+        @routes          = {}
+        @filters         = { before: [], after: [] }
+        @errors          = {}
+        @middleware      = []
+        @prototype       = nil
+        @prototype_mutex = Mutex.new
+        @extensions      = []
 
         @templates = if superclass.respond_to?(:templates)
                        Hash.new { |_hash, key| superclass.templates[key] }
@@ -1650,7 +1651,7 @@ module Sinatra
 
       # The prototype instance used to process requests.
       def prototype
-        @prototype ||= new
+        @prototype || @prototype_mutex.synchronize { @prototype ||= new }
       end
 
       # Create a new instance without middleware in front of it.
