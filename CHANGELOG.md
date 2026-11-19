@@ -1,5 +1,8 @@
 ## Unreleased
 
+* Fix: Make `Sinatra::TemplateCache` thread-safe ([#2180](https://github.com/sinatra/sinatra/pull/2180))
+  * Lock-free cache reads, synchronized writes on a cache miss; previously copied as-is from the deprecated `Tilt::Cache`, which is documented as not thread-safe. Fixes [#1926](https://github.com/sinatra/sinatra/issues/1926).
+
 ## 4.2.1 / 2025-10-10
 
 * Fix: Revert "`PATH_INFO` can never be empty" ([#2124](https://github.com/sinatra/sinatra/pull/2124))

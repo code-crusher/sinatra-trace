@@ -939,16 +939,18 @@ module Sinatra
   end
 
   # Extremely simple template cache implementation.
-  #   * Not thread-safe.
+  #   * Thread-safe: reads are lock-free, writes on a cache miss are
+  #     synchronized. If multiple threads miss on the same key at the same
+  #     time, the block is executed by all of them, but only the first
+  #     computed value is stored and returned by subsequent fetches.
   #   * Size is unbounded.
   #   * Keys are not copied defensively, and should not be modified after
   #     being passed to #fetch.  More specifically, the values returned by
   #     key#hash and key#eql? should not change.
-  #
-  # Implementation copied from Tilt::Cache.
   class TemplateCache
     def initialize
-      @cache = {}
+      @cache  = {}
+      @mutex  = Mutex.new
     end
 
     # Caches a value for key, or returns the previously cached value.
@@ -957,7 +959,9 @@ module Sinatra
     # which may be nil, is cached under key and returned.
     def fetch(*key)
       @cache.fetch(key) do
-        @cache[key] = yield
+        value = yield
+        @mutex.synchronize { @cache[key] = value unless @cache.key?(key) }
+        value
       end
     end
 
