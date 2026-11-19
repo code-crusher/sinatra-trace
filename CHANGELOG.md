@@ -1,5 +1,8 @@
 ## Unreleased
 
+* New: Add `insert_before` and `insert_after` to place middleware at a specific position in the stack ([#1659](https://github.com/sinatra/sinatra/issues/1659))
+  * Both accept a middleware or its index in the stack as the target, and raise an `ArgumentError` when it is not in the stack
+
 ## 4.2.1 / 2025-10-10
 
 * Fix: Revert "`PATH_INFO` can never be empty" ([#2124](https://github.com/sinatra/sinatra/pull/2124))

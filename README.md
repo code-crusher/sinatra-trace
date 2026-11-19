@@ -2414,6 +2414,24 @@ use Rack::Auth::Basic do |username, password|
 end
 ```
 
+Middleware added with `use` is placed at the end of the stack. To place it
+relative to a middleware that is already in the stack, use `insert_before`
+or `insert_after`, which take the middleware to insert next to, or its
+index in the stack:
+
+```ruby
+use MyCustomMiddleware
+insert_before MyCustomMiddleware, Rack::Lint
+insert_after 0, Rack::Runtime
+```
+
+Both methods accept the same arguments and block as `use`, and can place
+middleware first in the stack with `insert_before 0, MyMiddleware`. They
+raise an `ArgumentError` when the middleware or index given is not in the
+stack. Middleware that Sinatra adds based on settings, like `Rack::Head`
+or `Rack::Protection`, is not part of this stack; override
+`setup_default_middleware` to change the order of those.
+
 Rack is distributed with a variety of standard middleware for logging,
 debugging, URL routing, authentication, and session handling. Sinatra uses
 many of these components automatically based on configuration so you

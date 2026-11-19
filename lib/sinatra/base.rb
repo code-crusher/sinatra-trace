@@ -1587,6 +1587,30 @@ module Sinatra
       end
       ruby2_keywords(:use) if respond_to?(:ruby2_keywords, true)
 
+      # Insert the specified Rack middleware before the given +target+ in the
+      # middleware stack, which is the stack built by +use+. The +target+ is
+      # either the middleware to insert before or its index in the stack.
+      #
+      #   use MyMiddleware
+      #   insert_before MyMiddleware, OtherMiddleware
+      #   insert_before 0, OtherMiddleware
+      def insert_before(target, middleware, *args, &block)
+        insert_middleware(target, :before, middleware, args, block)
+      end
+      ruby2_keywords(:insert_before) if respond_to?(:ruby2_keywords, true)
+
+      # Insert the specified Rack middleware after the given +target+ in the
+      # middleware stack, which is the stack built by +use+. The +target+ is
+      # either the middleware to insert after or its index in the stack.
+      #
+      #   use MyMiddleware
+      #   insert_after MyMiddleware, OtherMiddleware
+      #   insert_after 0, OtherMiddleware
+      def insert_after(target, middleware, *args, &block)
+        insert_middleware(target, :after, middleware, args, block)
+      end
+      ruby2_keywords(:insert_after) if respond_to?(:ruby2_keywords, true)
+
       # Stop the self-hosted server if running.
       def quit!
         return unless running?
@@ -1829,6 +1853,35 @@ module Sinatra
 
       def setup_middleware(builder)
         middleware.each { |c, a, b| builder.use(c, *a, &b) }
+      end
+
+      # Inserts middleware into the middleware stack, before or after the
+      # given target, which is either a middleware or its index in the stack.
+      def insert_middleware(target, position, middleware, args, block)
+        stack     = self.middleware
+        inherited = stack.size - @middleware.size
+
+        index = if target.is_a?(Integer)
+                  target.negative? ? target + stack.size : target
+                else
+                  stack.index { |entry| entry.first == target }
+                end
+
+        # Like Array#insert, inserting before the end of the stack appends to
+        # it, while inserting after it needs a middleware to insert after.
+        last = position == :before ? stack.size : stack.size - 1
+        unless index && index >= 0 && index <= last
+          raise ArgumentError, "No such middleware to insert #{position}: #{target.inspect}"
+        end
+
+        index = index - inherited + (position == :after ? 1 : 0)
+        unless index >= 0 && index <= @middleware.size
+          raise ArgumentError, "Cannot insert #{position} #{target.inspect}: " \
+                               'middleware is inherited from a superclass'
+        end
+
+        @prototype = nil
+        @middleware.insert(index, [middleware, args, block])
       end
 
       def setup_logging(builder)
@@ -2116,8 +2169,9 @@ module Sinatra
 
     delegate :get, :patch, :put, :post, :delete, :head, :options, :link, :unlink,
              :template, :layout, :before, :after, :error, :not_found, :configure,
-             :set, :mime_type, :enable, :disable, :use, :development?, :test?,
-             :production?, :helpers, :settings, :register, :on_start, :on_stop
+             :set, :mime_type, :enable, :disable, :use, :insert_before, :insert_after,
+             :development?, :test?, :production?, :helpers, :settings, :register,
+             :on_start, :on_stop
 
     class << self
       attr_accessor :target
@@ -2169,5 +2223,15 @@ module Sinatra
   # Use the middleware for classic applications.
   def self.use(*args, &block)
     Delegator.target.use(*args, &block)
+  end
+
+  # Insert middleware before another middleware for classic applications.
+  def self.insert_before(*args, &block)
+    Delegator.target.insert_before(*args, &block)
+  end
+
+  # Insert middleware after another middleware for classic applications.
+  def self.insert_after(*args, &block)
+    Delegator.target.insert_after(*args, &block)
   end
 end

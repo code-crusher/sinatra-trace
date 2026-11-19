@@ -117,6 +117,18 @@ class DelegatorTest < Minitest::Test
     assert_equal ["use", mixin.to_s], app.last_call
   end
 
+  it "inserts middleware before another with the delegation target" do
+    app, mixin = mirror, Module.new
+    Sinatra.insert_before Rack::Head, mixin
+    assert_equal ["insert_before", Rack::Head.to_s, mixin.to_s], app.last_call
+  end
+
+  it "inserts middleware after another with the delegation target" do
+    app, mixin = mirror, Module.new
+    Sinatra.insert_after Rack::Head, mixin
+    assert_equal ["insert_after", Rack::Head.to_s, mixin.to_s], app.last_call
+  end
+
   it "should work with method_missing proxies for options" do
     mixin = Module.new do
       def respond_to?(method, *)
@@ -163,6 +175,8 @@ class DelegatorTest < Minitest::Test
   delegates 'enable'
   delegates 'disable'
   delegates 'use'
+  delegates 'insert_before'
+  delegates 'insert_after'
   delegates 'development?'
   delegates 'test?'
   delegates 'production?'

@@ -41,6 +41,7 @@ RSpec.describe Sinatra::Reloader do
     options[:inline_templates] ||= nil
     options[:extensions] ||= []
     options[:middlewares] ||= []
+    options[:insertions] ||= []
     options[:filters] ||= []
     options[:errors] ||= {}
     options[:name] ||= app_name
@@ -171,6 +172,37 @@ RSpec.describe Sinatra::Reloader do
       update_app_file(:routes => ['get("/foo") { "foo" }'])
       get('/foo') # ...to perform the reload
       expect(app_const.middleware).to be_empty
+    end
+
+    it "knows when a middleware has been inserted" do
+      setup_example_app(
+        :routes => ['get("/foo") { "foo" }'],
+        :middlewares => ['Rack::Head']
+      )
+      update_app_file(
+        :routes => ['get("/foo") { "foo" }'],
+        :middlewares => ['Rack::Head'],
+        :insertions => ['insert_before Rack::Head, Rack::ContentLength']
+      )
+      get('/foo') # ...to perform the reload
+      expect(app_const.middleware.map(&:first)).to include(Rack::ContentLength)
+    end
+
+    it "doesn't duplicate inserted middleware with every reload" do
+      setup_example_app(
+        :routes => ['get("/foo") { "foo" }'],
+        :middlewares => ['Rack::Head'],
+        :insertions => ['insert_before Rack::Head, Rack::ContentLength']
+      )
+
+      expect {
+        update_app_file(
+          :routes => ['get("/foo") { "foo" }'],
+          :middlewares => ['Rack::Head'],
+          :insertions => ['insert_before Rack::Head, Rack::ContentLength']
+        )
+        get('/foo') # ...to perform the reload
+      }.to_not change { app_const.middleware.size }
     end
   end
 

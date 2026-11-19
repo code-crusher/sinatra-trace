@@ -15,6 +15,10 @@ class <%= name %> < <%= parent %>
   use <%= middleware %>
 <% end %>
 
+<% insertions.each do |insertion| %>
+  <%= insertion %>
+<% end %>
+
 <% filters.each do |filter| %>
   <%= filter %>
 <% end %>

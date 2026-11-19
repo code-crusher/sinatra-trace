@@ -314,6 +314,24 @@ module Sinatra
         super
       end
 
+      # Does everything Sinatra::Base#insert_before does, but it also tells
+      # the +Watcher::List+ for the Sinatra application to watch the
+      # middleware being inserted.
+      def insert_before(target, middleware, *args, &block)
+        path = caller_files[1] || File.expand_path($0)
+        watch_element(path, :middleware, [middleware, args, block])
+        super
+      end
+
+      # Does everything Sinatra::Base#insert_after does, but it also tells
+      # the +Watcher::List+ for the Sinatra application to watch the
+      # middleware being inserted.
+      def insert_after(target, middleware, *args, &block)
+        path = caller_files[1] || File.expand_path($0)
+        watch_element(path, :middleware, [middleware, args, block])
+        super
+      end
+
       # Does everything Sinatra::Base#add_filter does, but it also tells
       # the +Watcher::List+ for the Sinatra application to watch the defined
       # filter.
