@@ -1247,7 +1247,9 @@ module Sinatra
 
       raise boom if settings.raise_errors? || settings.show_exceptions?
 
-      error_block! Exception, boom
+      status 500
+      content_type 'text/html'
+      body '<h1>Internal Server Error</h1>'
     end
 
     # Find an custom error block for the key(s) specified.
@@ -1265,7 +1267,7 @@ module Sinatra
           return resp unless resp.nil? && !first
         end
       end
-      return false unless key.respond_to?(:superclass) && (key.superclass < Exception)
+      return false unless key.respond_to?(:superclass) && (key.superclass <= Exception)
 
       error_block!(key.superclass, *block_params)
     end
@@ -2015,12 +2017,6 @@ module Sinatra
     set :static_cache_control, false
     
     set :static_headers, {}
-
-    error ::Exception do
-      response.status = 500
-      content_type 'text/html'
-      '<h1>Internal Server Error</h1>'
-    end
 
     configure :development do
       get '/__sinatra__/:image.png' do
